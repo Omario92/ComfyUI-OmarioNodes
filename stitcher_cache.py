@@ -6,6 +6,9 @@ import torch
 
 
 CACHE_VERSION = 1
+DEFAULT_CACHE_KEY = "HALIDA_FACESWAP_LPBN_V2"
+ENV_CACHE_DIR = "OMARIO_INPAINT_CROP_CACHE_DIR"
+FALLBACK_CACHE_DIR = "/workspace/ComfyUI/user/default/inpaint_crop_cache"
 
 
 def _safe_name(name: str) -> str:
@@ -15,10 +18,39 @@ def _safe_name(name: str) -> str:
     return name or "default_cache"
 
 
-def _cache_file(cache_dir: str, cache_key: str) -> Path:
-    cache_dir = Path(cache_dir).expanduser()
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    return cache_dir / f"{_safe_name(cache_key)}.pt"
+def _comfy_user_dir():
+    try:
+        import folder_paths  # type: ignore
+
+        return Path(folder_paths.get_user_directory())
+    except Exception:
+        return None
+
+
+def _default_cache_dir() -> Path:
+    env_dir = os.getenv(ENV_CACHE_DIR, "").strip()
+    if env_dir:
+        return Path(env_dir).expanduser()
+
+    comfy_user = _comfy_user_dir()
+    if comfy_user is not None:
+        return comfy_user / "default" / "inpaint_crop_cache"
+
+    return Path(FALLBACK_CACHE_DIR).expanduser()
+
+
+def _resolve_cache_dir(cache_dir: str | None) -> Path:
+    raw = str(cache_dir).strip() if cache_dir is not None else ""
+    if raw:
+        return Path(raw).expanduser()
+    return _default_cache_dir()
+
+
+def _cache_file(cache_dir: str, cache_key: str, ensure_dir: bool = True) -> Path:
+    resolved_dir = _resolve_cache_dir(cache_dir)
+    if ensure_dir:
+        resolved_dir.mkdir(parents=True, exist_ok=True)
+    return resolved_dir / f"{_safe_name(cache_key)}.pt"
 
 
 def _to_cpu(obj):
@@ -52,8 +84,8 @@ class SaveInpaintCropCache:
                 "stitcher": ("STITCHER",),
                 "cropped_image": ("IMAGE",),
                 "cropped_mask": ("MASK",),
-                "cache_key": ("STRING", {"default": "HALIDA_FACESWAP_LPBN_V2"}),
-                "cache_dir": ("STRING", {"default": "/workspace/ComfyUI/user/default/inpaint_crop_cache"}),
+                "cache_key": ("STRING", {"default": DEFAULT_CACHE_KEY}),
+                "cache_dir": ("STRING", {"default": FALLBACK_CACHE_DIR}),
                 "overwrite": ("BOOLEAN", {"default": True}),
             }
         }
@@ -64,7 +96,7 @@ class SaveInpaintCropCache:
     CATEGORY = "inpaint/cache"
 
     def save(self, stitcher, cropped_image, cropped_mask, cache_key, cache_dir, overwrite):
-        path = _cache_file(cache_dir, cache_key)
+        path = _cache_file(cache_dir, cache_key, ensure_dir=True)
 
         if overwrite or not path.exists():
             payload = {
@@ -87,8 +119,8 @@ class LoadInpaintCropCache:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "cache_key": ("STRING", {"default": "HALIDA_FACESWAP_LPBN_V2"}),
-                "cache_dir": ("STRING", {"default": "/workspace/ComfyUI/user/default/inpaint_crop_cache"}),
+                "cache_key": ("STRING", {"default": DEFAULT_CACHE_KEY}),
+                "cache_dir": ("STRING", {"default": FALLBACK_CACHE_DIR}),
             }
         }
 
@@ -99,19 +131,20 @@ class LoadInpaintCropCache:
 
     @classmethod
     def IS_CHANGED(cls, cache_key, cache_dir):
-        path = Path(cache_dir).expanduser() / f"{_safe_name(cache_key)}.pt"
+        path = _cache_file(cache_dir, cache_key, ensure_dir=False)
         if not path.exists():
             return "missing"
         stat = path.stat()
         return f"{stat.st_mtime_ns}:{stat.st_size}"
 
     def load(self, cache_key, cache_dir):
-        path = _cache_file(cache_dir, cache_key)
+        path = _cache_file(cache_dir, cache_key, ensure_dir=False)
 
         if not path.exists():
             raise FileNotFoundError(
                 f"Inpaint crop cache not found: {path}. "
-                f"Run Save Inpaint Crop Cache once first."
+                "Use a persistent volume on Runpod and keep cache_dir identical between pods. "
+                f"You can also set {ENV_CACHE_DIR}."
             )
 
         payload = _torch_load(path)
