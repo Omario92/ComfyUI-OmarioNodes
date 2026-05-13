@@ -81,13 +81,15 @@ class SaveInpaintCropCache:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "stitcher": ("STITCHER",),
-                "cropped_image": ("IMAGE",),
-                "cropped_mask": ("MASK",),
                 "cache_key": ("STRING", {"default": DEFAULT_CACHE_KEY}),
                 "cache_dir": ("STRING", {"default": FALLBACK_CACHE_DIR}),
                 "overwrite": ("BOOLEAN", {"default": True}),
-            }
+            },
+            "optional": {
+                "stitcher": ("STITCHER",),
+                "cropped_image": ("IMAGE",),
+                "cropped_mask": ("MASK",),
+            },
         }
 
     RETURN_TYPES = ("STITCHER", "IMAGE", "MASK", "STRING")
@@ -95,17 +97,21 @@ class SaveInpaintCropCache:
     FUNCTION = "save"
     CATEGORY = "inpaint/cache"
 
-    def save(self, stitcher, cropped_image, cropped_mask, cache_key, cache_dir, overwrite):
+    def save(self, cache_key, cache_dir, overwrite, stitcher=None, cropped_image=None, cropped_mask=None):
         path = _cache_file(cache_dir, cache_key, ensure_dir=True)
 
         if overwrite or not path.exists():
             payload = {
                 "version": CACHE_VERSION,
                 "cache_key": cache_key,
-                "stitcher": _to_cpu(stitcher),
-                "cropped_image": _to_cpu(cropped_image),
-                "cropped_mask": _to_cpu(cropped_mask),
             }
+
+            if stitcher is not None:
+                payload["stitcher"] = _to_cpu(stitcher)
+            if cropped_image is not None:
+                payload["cropped_image"] = _to_cpu(cropped_image)
+            if cropped_mask is not None:
+                payload["cropped_mask"] = _to_cpu(cropped_mask)
 
             tmp_path = path.with_suffix(f".{os.getpid()}.tmp")
             torch.save(payload, tmp_path)
@@ -156,8 +162,8 @@ class LoadInpaintCropCache:
             )
 
         return (
-            payload["stitcher"],
-            payload["cropped_image"],
-            payload["cropped_mask"],
+            payload.get("stitcher"),
+            payload.get("cropped_image"),
+            payload.get("cropped_mask"),
             str(path),
         )
