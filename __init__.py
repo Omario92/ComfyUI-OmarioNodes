@@ -6,6 +6,7 @@ from .gemma_api_text_encode import GemmaAPITextEncode
 from .mask_clamped_crop import MaskClampedCrop
 from .mask_clamped_crop_sticky import MaskClampedCropSticky
 from .light_leaks_transition import LightLeaksTransition
+from .stitcher_cache import SaveInpaintCropCache, LoadInpaintCropCache
 
 NODE_CLASS_MAPPINGS = {
     "DualEndpointColorBlendScheduler": DualEndpointColorBlendScheduler,
@@ -13,6 +14,8 @@ NODE_CLASS_MAPPINGS = {
     "MaskClampedCrop": MaskClampedCrop,
     "MaskClampedCropSticky": MaskClampedCropSticky,
     "LightLeaksTransition": LightLeaksTransition,
+    "SaveInpaintCropCache": SaveInpaintCropCache,
+    "LoadInpaintCropCache": LoadInpaintCropCache,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -21,4 +24,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "MaskClampedCrop": "Mask Tracking Crop (Clamped)",
     "MaskClampedCropSticky": "Mask Tracking Crop (Sticky)",
     "LightLeaksTransition": "🔦 Light Leaks Transition (like CrossFadeImages)",
+    "SaveInpaintCropCache": "💾 Save Inpaint Crop Cache",
+    "LoadInpaintCropCache": "📦 Load Inpaint Crop Cache",
 }
