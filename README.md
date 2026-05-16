@@ -9,6 +9,7 @@ Custom nodes for ComfyUI by [Omario92](https://github.com/Omario92).
 | Node | Display name | Description |
 | --- | --- | --- |
 | `LightLeaksTransition` | Light Leaks Transition (like CrossFadeImages) | Light leak transition effect similar to CrossFadeImages. |
+| `SaveImagePlus` | Save Image Plus | Save images with subfolder, timestamp, metadata, and extension controls. |
 
 ### Mask & Crop
 
