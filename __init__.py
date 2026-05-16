@@ -8,6 +8,7 @@ from .mask_clamped_crop_sticky import MaskClampedCropSticky
 from .light_leaks_transition import LightLeaksTransition
 from .stitcher_cache import SaveInpaintCropCache, LoadInpaintCropCache
 from .conditioning_utils import SaveConditioning, LoadConditioning
+from .save_image_plus import SaveImagePlus
 
 NODE_CLASS_MAPPINGS = {
     "DualEndpointColorBlendScheduler": DualEndpointColorBlendScheduler,
@@ -19,6 +20,7 @@ NODE_CLASS_MAPPINGS = {
     "LoadInpaintCropCache": LoadInpaintCropCache,
     "SaveConditioning": SaveConditioning,
     "LoadConditioning": LoadConditioning,
+    "SaveImagePlus": SaveImagePlus,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -31,4 +33,5 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "LoadInpaintCropCache": "Load Inpaint Crop Cache",
     "SaveConditioning": "Save Conditioning",
     "LoadConditioning": "Load Conditioning",
+    "SaveImagePlus": "Save Image Plus",
 }
