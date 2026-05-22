@@ -59,6 +59,15 @@ class LightLeaksTransition:
                 "light_curve": (["peak_middle", "constant", "fade_in_out"], {"default": "peak_middle"}),
                 "blend_mode": (["screen", "add"], {"default": "screen"}),
             },
+            "optional": {
+                # Khi bật stretch_frame: hold frame cuối của images_1 và frame đầu của
+                # images_2, kéo dài đủ transitioning_frames thay vì dùng frame thật.
+                # -> Transition luôn đủ dài kể cả khi start_index nằm sát cuối video 1.
+                "stretch_frame": ("BOOLEAN", {"default": False}),
+                # full   : cả 2 phía đều dùng hold frame (đứng yên 100% trong transition)
+                # smart  : dùng frame thật khi còn đủ, hết frame thật mới hold (mượt hơn)
+                "stretch_mode": (["full", "smart"], {"default": "full"}),
+            },
         }
 
     RETURN_TYPES = ("IMAGE",)
@@ -78,17 +87,26 @@ class LightLeaksTransition:
         light_intensity,
         light_curve,
         blend_mode,
+        stretch_frame=False,
+        stretch_mode="full",
     ):
         # Xử lý index âm (giống KJNodes)
         if transition_start_index < 0:
             transition_start_index = len(images_1) + transition_start_index
 
         transition_start_index = max(0, transition_start_index)
-        transitioning_frames = min(
-            transitioning_frames,
-            len(images_1) - transition_start_index,
-            len(images_2),
-        )
+        transition_start_index = min(transition_start_index, len(images_1))
+
+        if stretch_frame:
+            # Ở chế độ stretch: KHÔNG cắt transitioning_frames theo số frame còn lại,
+            # vì ta sẽ hold frame để bù. Chỉ giữ nguyên giá trị người dùng chọn.
+            transitioning_frames = max(1, transitioning_frames)
+        else:
+            transitioning_frames = min(
+                transitioning_frames,
+                len(images_1) - transition_start_index,
+                len(images_2),
+            )
 
         if transitioning_frames <= 0:
             # Không có transition → trả về images_1 + images_2 còn lại
@@ -103,11 +121,38 @@ class LightLeaksTransition:
         # Chuẩn bị light leak (lặp lại nếu cần)
         leak_count = light_leaks.shape[0]
 
+        # Số frame "thật" còn lại ở mỗi phía (dùng cho stretch_mode = "smart")
+        avail_1 = len(images_1) - transition_start_index  # frame còn lại của video 1
+        avail_2 = len(images_2)  # frame của video 2
+
+        # Index của frame dùng để hold ở mỗi phía
+        # - video 1: frame cuối cùng (ngay trước khi cắt sang video 2)
+        last_idx_1 = len(images_1) - 1
+        # - video 2: frame đầu tiên
+        first_idx_2 = 0
+
         for i in range(transitioning_frames):
+            # ----- Chọn frame nguồn cho từng phía -----
+            if not stretch_frame:
+                # Hành vi gốc: dùng frame thật theo thứ tự
+                src1_idx = transition_start_index + i
+                src2_idx = i
+            elif stretch_mode == "smart":
+                # Dùng frame thật khi còn, hết thì hold frame cuối/đầu
+                src1_idx = transition_start_index + i
+                if src1_idx > last_idx_1:
+                    src1_idx = last_idx_1
+                src2_idx = i if i < avail_2 else first_idx_2
+            else:  # stretch_mode == "full"
+                # Hold cứng: video 1 luôn là frame cuối, video 2 luôn là frame đầu
+                src1_idx = last_idx_1
+                src2_idx = first_idx_2
+
+            img1 = images_1[src1_idx]
+            img2 = images_2[src2_idx]
+
             # Crossfade giữa 2 ảnh
             alpha = easing(alphas[i])
-            img1 = images_1[transition_start_index + i]
-            img2 = images_2[i]
             cross = (1 - alpha) * img1 + alpha * img2
 
             # Áp dụng Light Leak (cycle theo batch light_leaks)
@@ -129,7 +174,11 @@ class LightLeaksTransition:
             # Blend
             if blend_mode == "screen":
                 screened = screen_blend(cross, leak)
-                leaked = torch.lerp(cross, screened, torch.tensor(opacity, device=cross.device, dtype=cross.dtype).clamp(0.0, 1.0))
+                leaked = torch.lerp(
+                    cross,
+                    screened,
+                    torch.tensor(opacity, device=cross.device, dtype=cross.dtype).clamp(0.0, 1.0),
+                )
             else:
                 leaked = add_blend(cross, leak, opacity)
 
@@ -137,9 +186,15 @@ class LightLeaksTransition:
 
         transition_tensor = torch.stack(transition_images, dim=0)
 
-        # Ghép lại giống CrossFadeImages
+        # ----- Ghép lại -----
         beginning = images_1[:transition_start_index]
-        remaining = images_2[transitioning_frames:]
+
+        if stretch_frame:
+            # Đã hold frame trong transition nên KHÔNG tiêu thụ frame thật của video 2.
+            # Toàn bộ video 2 (từ frame đầu) được nối sau transition để giữ nguyên độ dài.
+            remaining = images_2
+        else:
+            remaining = images_2[transitioning_frames:]
 
         result = torch.cat([beginning, transition_tensor], dim=0)
         if len(remaining) > 0:
