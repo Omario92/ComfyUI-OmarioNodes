@@ -24,6 +24,13 @@ Custom nodes for ComfyUI by [Omario92](https://github.com/Omario92).
 | --- | --- | --- |
 | `DualEndpointColorBlendScheduler` | Dual Endpoint Color Blend (by Frames) | Three-point color blending with a flexible frame timeline. |
 
+### Utilities
+
+| Node | Display name | Description |
+| --- | --- | --- |
+| `VideoResolutionSelector` | Video Resolution Selector | Create aspect-ratio resolutions by target megapixels, maximum long edge, or target shorter edge, aligned to a selectable multiple. Inactive sizing inputs are hidden automatically. |
+| `PadBatchTo17nPlus5` | Pad Batch to 17n+5 | Repeat the final video frame until the batch length matches `17n+5`, as required by MiniMax-H3 video inputs. Outputs the padded batch, original frame count, and padded frame count. |
+
 ### API & Text
 
 | Node | Display name | Description |
